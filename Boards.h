@@ -679,6 +679,7 @@
       #define DIO2_AS_RF_SWITCH true
       #define HAS_BUSY true
       #define HAS_TCXO true
+      #define HAS_RF_SWITCH_RX_TX true
 
       #define HAS_DISPLAY false
       #define HAS_CONSOLE true
@@ -703,6 +704,8 @@
       const int pin_tcxo_enable = -1;
       const int pin_dio = 39;
       const int pin_busy = 40;
+      const int pin_rxen = 38;
+      const int pin_txen = -1;
       
       #if HAS_NP == false
         #if defined(EXTERNAL_LEDS)
