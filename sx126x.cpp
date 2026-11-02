@@ -142,6 +142,14 @@ bool sx126x::preInit() {
     SPI.begin();
   #endif
 
+  #if BOARD_MODEL == BOARD_XIAO_S3
+    // The Wio-SX1262 uses DIO3 to power its TCXO. Bring the
+    // oscillator up before probing SX1262 registers.
+    if (_busy != -1) { pinMode(_busy, INPUT); }
+    enableTCXO();
+    delay(10);
+  #endif
+
   // Check version (retry for up to 2 seconds)
   // TODO: Actually read version registers, not syncwords
   long start = millis();
@@ -339,9 +347,18 @@ int sx126x::begin(long frequency) {
   if (!_preinit_done) { if (!preInit()) { return false; } }
   if (_rxen != -1) { pinMode(_rxen, OUTPUT); }
 
+  #if BOARD_MODEL == BOARD_XIAO_S3
+    // reset() clears DIO3 TCXO control, so restore it before
+    // calibration on the Wio-SX1262.
+    enableTCXO();
+    delay(10);
+  #endif
+
   calibrate();
   calibrate_image(frequency);
-  enableTCXO();
+  #if BOARD_MODEL != BOARD_XIAO_S3
+    enableTCXO();
+  #endif
   loraMode();
   standby();
 
@@ -434,6 +451,12 @@ int sx126x::begin(long frequency) {
 void sx126x::end() { sleep(); SPI.end(); _preinit_done = false; }
 
 int sx126x::beginPacket(int implicitHeader) {
+  #if BOARD_MODEL == BOARD_XIAO_S3
+    // Wio-SX1262 RF_SW is an external RX enable. DIO2 controls
+    // the TX side of the module's RF switch.
+    if (_rxen != -1) { digitalWrite(_rxen, LOW); }
+  #endif
+
   #if HAS_LORA_PA
     if (lora_pa_model == LORA_PA_GC1109) {
       // Enable PA CPS for transmit
@@ -687,8 +710,10 @@ void sx126x::sleep() { uint8_t byte = 0x00; executeOpcode(OP_SLEEP_6X, &byte, 1)
 
 void sx126x::enableTCXO() {
   #if HAS_TCXO
-    #if BOARD_MODEL == BOARD_RAK4631 || BOARD_MODEL == BOARD_HELTEC32_V3 || BOARD_MODEL == BOARD_XIAO_S3
+    #if BOARD_MODEL == BOARD_RAK4631 || BOARD_MODEL == BOARD_HELTEC32_V3
       uint8_t buf[4] = {MODE_TCXO_3_3V_6X, 0x00, 0x00, 0xFF};
+    #elif BOARD_MODEL == BOARD_XIAO_S3
+      uint8_t buf[4] = {MODE_TCXO_1_8V_6X, 0x00, 0x00, 0xFF};
     #elif BOARD_MODEL == BOARD_TBEAM
       uint8_t buf[4] = {MODE_TCXO_1_8V_6X, 0x00, 0x00, 0xFF};
     #elif BOARD_MODEL == BOARD_TDECK
